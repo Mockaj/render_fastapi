@@ -7,6 +7,7 @@ from rag.voyage_embed import get_embeddings
 from rag.qdrant import qdrant_client
 from rag.logger import logger
 from qdrant_client.models import PointStruct
+from qdrant_client.http.models import Filter, MatchValue
 
 BATCH_SIZE = 100
 
@@ -47,6 +48,10 @@ def process_batch(texts: List[str], payloads: List[dict], start_id: int) -> None
 async def seed_law_from_url(url: str) -> Law:
     # Parse the URL
     year, law_id = parse_law_url(url)
+
+    # Check if law already exists
+    if law_exists(year, law_id):
+        raise ValueError(f"Law {year}/{law_id} already exists in the database")
 
     # Create initial Law object
     law = Law(
@@ -108,3 +113,38 @@ async def seed_law_from_url(url: str) -> Law:
         )
 
     return law
+
+
+def law_exists(year: str, law_id: str) -> bool:
+    try:
+        # Create filter according to Qdrant's documentation
+        filter = {
+            "must": [
+                {
+                    "key": "law_year",
+                    "match": {
+                        "value": year
+                    }
+                },
+                {
+                    "key": "law_id",
+                    "match": {
+                        "value": law_id
+                    }
+                }
+            ]
+        }
+        
+        # Search with the filter using scroll method
+        results = qdrant_client.scroll(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            scroll_filter=filter,  # Use scroll_filter instead of filter
+            limit=1,
+            with_payload=True,
+            with_vectors=False
+        )[0]
+        
+        return len(results) > 0
+    except Exception as e:
+        logger.error(f"Failed to check if law exists: {e}")
+        raise
