@@ -89,6 +89,7 @@ async def seed_law_from_url(url: str) -> Law:
             "law_category": law.category,
             "law_date": law.date,
             "law_staleURL": law.staleURL,
+            "datumZruseni": law.datumZruseni,
             "paragraph_cislo": para.cislo,
             "paragraph_zneni": para.zneni,
         })

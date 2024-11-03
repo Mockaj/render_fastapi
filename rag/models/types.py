@@ -15,6 +15,7 @@ class Law(BaseModel):
     category: Optional[str] = None
     date: Optional[str] = None
     staleURL: Optional[str] = None
+    datumZruseni: Optional[str] = None
     paragrafy: List[Paragraf] = Field(default_factory=list)
 
 
