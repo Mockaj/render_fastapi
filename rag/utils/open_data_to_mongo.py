@@ -9,9 +9,12 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 load_dotenv()
 # Define the Pydantic models
+
+
 class Paragraf(BaseModel):
     cislo: str
     zneni: str
+
 
 class Law(BaseModel):
     nazev: str
@@ -23,6 +26,8 @@ class Law(BaseModel):
     paragrafy: List[Paragraf] = []
 
 # Function to parse the text into Law instances
+
+
 def parse_laws(text: str) -> List[Law]:
     laws = []
     current_category = None
@@ -67,11 +72,15 @@ def parse_laws(text: str) -> List[Law]:
     return laws
 
 # Function to get MongoDB client
+
+
 def get_mongo_client():
     client = MongoClient("mongodb://localhost:27017/")
     return client
 
 # Function to save Law instance to MongoDB
+
+
 def save_law_to_mongodb(law: Law, db_name='law_database_mvp', collection_name='MVP'):
     client = get_mongo_client()
     db = client[db_name]
@@ -81,6 +90,8 @@ def save_law_to_mongodb(law: Law, db_name='law_database_mvp', collection_name='M
     print(f"Law {law.year}/{law.id} saved to collection '{collection_name}'.")
 
 # Function to fetch law details and paragraphs from the API
+
+
 def get_law_details(law: Law, api_key: str) -> Law:
     headers = {"esel-api-access-key": api_key}
     # Construct the 'sign'
@@ -95,15 +106,22 @@ def get_law_details(law: Law, api_key: str) -> Law:
         res.raise_for_status()
         data = res.json()
     except Exception as e:
-        print(f"Failed to fetch law details for {law.year}/{law.id}. Error: {e}")
-        return law  # Return the law as is
-
-    if data.get('nazev') is None:
-        print(f"No 'nazev' found for law {law.year}/{law.id}")
+        print(
+            f"Failed to fetch law details for {law.year}/{law.id}. Error: {e}")
         return law
 
-    law.nazev = data['nazev']
-    law.staleURL = data['staleUrl']
+    # Check if law is cancelled
+    datum_zruseni = data.get('datumZruseni')
+    if datum_zruseni:
+        from datetime import datetime
+        cancellation_date = datetime.strptime(datum_zruseni, '%Y-%m-%d')
+        if cancellation_date < datetime.now():
+            raise ValueError(
+                f"Law {law.year}/{law.id} was cancelled on {datum_zruseni}")
+
+    law.datumZruseni = datum_zruseni
+    law.nazev = data.get('nazev')
+    law.staleURL = data.get('staleUrl')
 
     # Now fetch the fragments (paragraphs)
     page_number = 0
@@ -117,13 +135,15 @@ def get_law_details(law: Law, api_key: str) -> Law:
             resp.raise_for_status()
             response = resp.json()
         except Exception as e:
-            print(f"Failed to fetch fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
+            print(
+                f"Failed to fetch fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
             break
 
         fragments = response.get('seznam', [])
         if not fragments:
             # If no fragments are returned, break the loop
-            print(f"No fragments found on page {page_number} for law {law.year}/{law.id}")
+            print(
+                f"No fragments found on page {page_number} for law {law.year}/{law.id}")
             break
 
         current_paragraph_number = None
@@ -143,7 +163,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
                     # Start a new paragraph
                     match = re.search(num_pattern, xhtml_content)
                     if match is None:
-                        print(f"Paragraf number not found in fragment for law {law.year}/{law.id}")
+                        print(
+                            f"Paragraf number not found in fragment for law {law.year}/{law.id}")
                         continue
                     current_paragraph_number = match.group()
                     current_paragraph_text = ""
@@ -159,7 +180,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
                     zneni=current_paragraph_text.strip()
                 ))
         except Exception as e:
-            print(f"Error processing fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
+            print(
+                f"Error processing fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
 
         page_number += 1  # Increment page number to fetch the next page
 
@@ -287,5 +309,7 @@ TRESTNÍ PRÁVO
         print(f"Processing law {law.year}/{law.id}")
         law = get_law_details(law, open_data_api_key)
         save_law_to_mongodb(law)
+
+
 if __name__ == '__main__':
     main()
