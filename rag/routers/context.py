@@ -9,6 +9,7 @@ from rag.services.auth_service import get_current_username
 import secrets
 from rag.models import Law
 from rag.services.seed_service import seed_law_from_url
+from rag.services.reranking_service import rerank_documents
 
 router = APIRouter()
 
@@ -18,9 +19,8 @@ security = HTTPBasic()
 async def get_context(
     request: QueryRequest = Body(...),
     n: int = Query(default=settings.DEFAULT_N, ge=1),
-    username: str = Depends(get_current_username)  # Authentication dependency
+    username: str = Depends(get_current_username)
 ):
-    # The rest of your code remains the same
     try:
         # Enhance the query using Langtail
         enhanced_query = enhance_query_with_langtail(request.query)
@@ -28,10 +28,17 @@ async def get_context(
         # Embed the enhanced query
         embedding = embed_query(enhanced_query)
 
-        # Search Qdrant for relevant documents
-        documents = search_qdrant(embedding=embedding, top_n=n)
+        # First get 5 documents from Qdrant
+        initial_documents = search_qdrant(embedding=embedding, top_n=5)
 
-        return QueryResponse(relevant_docs=documents)
+        # Rerank the documents
+        reranked_documents = rerank_documents(
+            query=request.query,
+            documents=initial_documents,
+            top_k=n
+        )
+
+        return QueryResponse(relevant_docs=reranked_documents)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except RuntimeError as re:
