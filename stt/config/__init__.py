@@ -1,0 +1,1 @@
+from stt.config.settings import settings

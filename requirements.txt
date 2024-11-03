@@ -1,0 +1,10 @@
+fastapi
+fastapi[standard]
+voyageai
+openai
+tiktoken
+pymongo
+python-dotenv
+qdrant-client
+pydantic
+pydantic_settings
