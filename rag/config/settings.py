@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     AUTH_USERNAME1: str = Field(..., env='AUTH_USERNAME1')
     AUTH_PASSWORD1: str = Field(..., env='AUTH_PASSWORD1')
 
+    # Supabase settings
+    SUPABASE_URL: str = Field(..., env='SUPABASE_URL')
+    SUPABASE_KEY: str = Field(..., env='SUPABASE_KEY')
+
     model_config = SettingsConfigDict(env_file=os.getenv('ENV_FILE_RAG', None))
 
 settings = Settings()

@@ -1,5 +1,5 @@
 # models/types.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 
@@ -22,7 +22,7 @@ class Law(BaseModel):
 class QueryRequest(BaseModel):
     query: str
 
-    @validator('query')
+    @field_validator('query')
     def query_must_be_non_empty(cls, v):
         if not v.strip():
             raise ValueError('Query must be a non-empty string')
@@ -38,6 +38,7 @@ class RelevantDocument(BaseModel):
     law_staleURL: Optional[str]
     paragraph_cislo: str
     paragraph_zneni: str
+    score: float = 0.0
 
 
 class QueryResponse(BaseModel):
@@ -47,7 +48,7 @@ class QueryResponse(BaseModel):
 class SeedLawRequest(BaseModel):
     url: str
 
-    @validator('url')
+    @field_validator('url')
     def validate_url(cls, v):
         if not v.startswith('https://www.zakonyprolidi.cz'):
             raise ValueError('URL must be from zakonyprolidi.cz')

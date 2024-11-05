@@ -10,6 +10,7 @@ import secrets
 from rag.models import Law
 from rag.services.seed_service import seed_law_from_url
 from rag.services.reranking_service import rerank_documents
+from rag.services.logging_service import log_semantic_search
 
 router = APIRouter()
 
@@ -37,6 +38,9 @@ async def get_context(
             documents=initial_documents,
             top_k=n
         )
+
+        # Log the search results
+        await log_semantic_search(request.query, reranked_documents)
 
         return QueryResponse(relevant_docs=reranked_documents)
     except ValueError as ve:
