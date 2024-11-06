@@ -114,8 +114,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
         res.raise_for_status()
         data = res.json()
     except Exception as e:
-        logger.error(f"Failed to fetch law details for
-                     {law.year}/{law.id}. Error: {e}")
+        logger.error(f"Failed to fetch law details for law"
+                     f"{law.year}/{law.id}. Error: {e}")
         return law
 
     # Check if law is cancelled
@@ -142,14 +142,14 @@ def get_law_details(law: Law, api_key: str) -> Law:
         fragments_url = f"{base_url}{
             sign_encoded}/fragmenty?cisloStranky={page_number}"
         try:
-            logger.info(f"Fetching page {page_number} for law
-                        {law.year}/{law.id}")
+            logger.info(f"Fetching page {page_number} for law"
+                        f"{law.year}/{law.id}")
             resp = requests.get(fragments_url, headers=headers)
 
             # If we get a 404 or any error, we've reached the end
             if resp.status_code != 200:
-                logger.info(f"Reached end of document at page 
-                {page_number} for law {law.year}/{law.id}")
+                logger.info(f"Reached end of document at page"
+                            f"{page_number} for law {law.year}/{law.id}")
                 break
 
             response = resp.json()
@@ -157,8 +157,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
 
             # If no fragments are returned, we've reached the end
             if not fragments:
-                logger.info(f"No more fragments found at page
-                            {page_number} for law {law.year}/{law.id}")
+                logger.info(f"No more fragments found at page"
+                            f"{page_number} for law {law.year}/{law.id}")
                 break
 
             for fragment in fragments:
@@ -175,8 +175,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
                     # Start new paragraph
                     match = re.search(num_pattern, xhtml_content)
                     if match is None:
-                        logger.warning(f"Paragraf number not found in fragment for law
-                                       {law.year}/{law.id}")
+                        logger.warning(f"Paragraf number not found in fragment for law"
+                                       f"{law.year}/{law.id}")
                         continue
                     current_paragraph_number = match.group()
                     current_paragraph_text = ""
@@ -192,8 +192,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
             time.sleep(0.5)
 
         except Exception as e:
-            logger.error(f"Error processing page 
-            {page_number} for law {law.year}/{law.id}: {e}")
+            logger.error(f"Error processing page {page_number} for law"
+                         f"{law.year}/{law.id}: {e}")
             break
 
     # Save the last paragraph if any
