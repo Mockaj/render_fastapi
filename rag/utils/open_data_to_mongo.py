@@ -7,6 +7,9 @@ import requests
 from pymongo import MongoClient
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import logging
+import time
+
 load_dotenv()
 # Define the Pydantic models
 
@@ -24,6 +27,11 @@ class Law(BaseModel):
     date: Optional[str]
     staleURL: Optional[str] = None
     paragrafy: List[Paragraf] = []
+
+
+# Add after the imports
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Function to parse the text into Law instances
 
@@ -106,8 +114,8 @@ def get_law_details(law: Law, api_key: str) -> Law:
         res.raise_for_status()
         data = res.json()
     except Exception as e:
-        print(
-            f"Failed to fetch law details for {law.year}/{law.id}. Error: {e}")
+        logger.error(f"Failed to fetch law details for {
+                     law.year}/{law.id}. Error: {e}")
         return law
 
     # Check if law is cancelled
@@ -123,68 +131,77 @@ def get_law_details(law: Law, api_key: str) -> Law:
     law.nazev = data.get('nazev')
     law.staleURL = data.get('staleUrl')
 
-    # Now fetch the fragments (paragraphs)
+    # Now fetch the fragments (paragraphs) page by page
     page_number = 0
     num_pattern = r'\d+'
     text_pattern = r'<[^>]+>'
+    current_paragraph_number = None
+    current_paragraph_text = ""
+
     while True:
-        fragments_url = f"{base_url}{sign_encoded}/fragmenty?cisloStranky={page_number}"
+        fragments_url = f"{base_url}{
+            sign_encoded}/fragmenty?cisloStranky={page_number}"
         try:
-            print(f"Fetching page {page_number} for law {law.year}/{law.id}")
+            logger.info(f"Fetching page {page_number} for law {
+                        law.year}/{law.id}")
             resp = requests.get(fragments_url, headers=headers)
-            resp.raise_for_status()
+
+            # If we get a 404 or any error, we've reached the end
+            if resp.status_code != 200:
+                logger.info(f"Reached end of document at page {
+                            page_number} for law {law.year}/{law.id}")
+                break
+
             response = resp.json()
-        except Exception as e:
-            print(
-                f"Failed to fetch fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
-            break
+            fragments = response.get('seznam', [])
 
-        fragments = response.get('seznam', [])
-        if not fragments:
-            # If no fragments are returned, break the loop
-            print(
-                f"No fragments found on page {page_number} for law {law.year}/{law.id}")
-            break
+            # If no fragments are returned, we've reached the end
+            if not fragments:
+                logger.info(f"No more fragments found at page {
+                            page_number} for law {law.year}/{law.id}")
+                break
 
-        current_paragraph_number = None
-        current_paragraph_text = ""
-        try:
             for fragment in fragments:
                 kod_typu_fragmentu = fragment.get('kodTypuFragmentu')
                 xhtml_content = fragment.get('xhtml', '')
 
                 if kod_typu_fragmentu == 'Paragraf':
-                    if current_paragraph_number is not None:
-                        # Save the current paragraph before starting a new one
+                    # Save previous paragraph if exists
+                    if current_paragraph_number is not None and current_paragraph_text.strip():
                         law.paragrafy.append(Paragraf(
                             cislo=current_paragraph_number,
                             zneni=current_paragraph_text.strip()
                         ))
-                    # Start a new paragraph
+                    # Start new paragraph
                     match = re.search(num_pattern, xhtml_content)
                     if match is None:
-                        print(
-                            f"Paragraf number not found in fragment for law {law.year}/{law.id}")
+                        logger.warning(f"Paragraf number not found in fragment for law {
+                                       law.year}/{law.id}")
                         continue
                     current_paragraph_number = match.group()
                     current_paragraph_text = ""
                 else:
-                    # Append fragment text to the current paragraph
+                    # Append fragment text to current paragraph
                     cleaned_text = re.sub(text_pattern, '', xhtml_content)
                     current_paragraph_text += cleaned_text + "\n"
 
-            # Save the last paragraph if any
-            if current_paragraph_number is not None and current_paragraph_text.strip():
-                law.paragrafy.append(Paragraf(
-                    cislo=current_paragraph_number,
-                    zneni=current_paragraph_text.strip()
-                ))
+            # Move to next page
+            page_number += 1
+
+            # Add small delay to be nice to the API
+            time.sleep(0.5)
+
         except Exception as e:
-            print(
-                f"Error processing fragments for law {law.year}/{law.id}, page {page_number}. Error: {e}")
+            logger.error(f"Error processing page {
+                         page_number} for law {law.year}/{law.id}: {e}")
+            break
 
-        page_number += 1  # Increment page number to fetch the next page
-
+    # Save the last paragraph if any
+    if current_paragraph_number is not None and current_paragraph_text.strip():
+        law.paragrafy.append(Paragraf(
+            cislo=current_paragraph_number,
+            zneni=current_paragraph_text.strip()
+        ))
     return law
 
 
@@ -309,7 +326,3 @@ TRESTNÍ PRÁVO
         print(f"Processing law {law.year}/{law.id}")
         law = get_law_details(law, open_data_api_key)
         save_law_to_mongodb(law)
-
-
-if __name__ == '__main__':
-    main()
