@@ -40,26 +40,26 @@ def parse_laws(text: str) -> List[Law]:
     laws = []
     current_category = None
     category_list = [
-        'FINANCE',
-        'MEZINÁRODNÍ PRÁVO',
-        'OBČANSKÉ PRÁVO',
-        'Obchod a podnikání',
-        'PRACOVNÍ PRÁVO',
-        'SPRÁVNÍ PRÁVO',
-        'TRESTNÍ PRÁVO',
-        'ÚSTAVNÍ PRÁVO',
-        'HOSPODÁŘSTVÍ'
+        "FINANCE",
+        "MEZINÁRODNÍ PRÁVO",
+        "OBČANSKÉ PRÁVO",
+        "Obchod a podnikání",
+        "PRACOVNÍ PRÁVO",
+        "SPRÁVNÍ PRÁVO",
+        "TRESTNÍ PRÁVO",
+        "ÚSTAVNÍ PRÁVO",
+        "HOSPODÁŘSTVÍ",
     ]
-    lines = text.strip().split('\n')
+    lines = text.strip().split("\n")
     law_pattern = re.compile(
-        r'^(\d+)/(\d+)\s+Sb[.]?\s+(.*?)(?:\s+(\d{2}[.]\d{2}[.]\d{4}))?$'
+        r"^(\d+)/(\d+)\s+Sb[.]?\s+(.*?)(?:\s+(\d{2}[.]\d{2}[.]\d{4}))?$"
     )
     for line in lines:
         line = line.strip()
         if not line:
             continue
         # Ignore column headers
-        if line.startswith('Číslo'):
+        if line.startswith("Číslo"):
             continue
         # Check if line is a category header
         if line in category_list:
@@ -79,6 +79,7 @@ def parse_laws(text: str) -> List[Law]:
             laws.append(law)
     return laws
 
+
 # Function to get MongoDB client
 
 
@@ -86,16 +87,18 @@ def get_mongo_client():
     client = MongoClient("mongodb://localhost:27017/")
     return client
 
+
 # Function to save Law instance to MongoDB
 
 
-def save_law_to_mongodb(law: Law, db_name='law_database_mvp', collection_name='MVP'):
+def save_law_to_mongodb(law: Law, db_name="law_database_mvp", collection_name="MVP"):
     client = get_mongo_client()
     db = client[db_name]
     collection = db[collection_name]
     law_doc = law.dict()
     collection.insert_one(law_doc)
     print(f"Law {law.year}/{law.id} saved to collection '{collection_name}'.")
+
 
 # Function to fetch law details and paragraphs from the API
 
@@ -104,7 +107,7 @@ def get_law_details(law: Law, api_key: str) -> Law:
     headers = {"esel-api-access-key": api_key}
     # Construct the 'sign'
     sign = f"/sb/{law.year}/{law.id}/0000-00-00"
-    sign_encoded = quote(sign, safe='')
+    sign_encoded = quote(sign, safe="")
 
     base_url = "https://api.e-sbirka.cz/dokumenty-sbirky/"
     # Get the law metadata
@@ -114,75 +117,87 @@ def get_law_details(law: Law, api_key: str) -> Law:
         res.raise_for_status()
         data = res.json()
     except Exception as e:
-        logger.error(f"Failed to fetch law details for law"
-                     f"{law.year}/{law.id}. Error: {e}")
+        logger.error(
+            f"Failed to fetch law details for law" f"{law.year}/{law.id}. Error: {e}"
+        )
         return law
 
     # Check if law is cancelled
-    datum_zruseni = data.get('datumZruseni')
+    datum_zruseni = data.get("datumZruseni")
     if datum_zruseni:
         from datetime import datetime
-        cancellation_date = datetime.strptime(datum_zruseni, '%Y-%m-%d')
+
+        cancellation_date = datetime.strptime(datum_zruseni, "%Y-%m-%d")
         if cancellation_date < datetime.now():
             raise ValueError(
-                f"Law {law.year}/{law.id} was cancelled on {datum_zruseni}")
+                f"Law {law.year}/{law.id} was cancelled on {datum_zruseni}"
+            )
 
     law.datumZruseni = datum_zruseni
-    law.nazev = data.get('nazev')
-    law.staleURL = data.get('staleUrl')
+    law.nazev = data.get("nazev")
+    law.staleURL = data.get("staleUrl")
 
     # Now fetch the fragments (paragraphs) page by page
     page_number = 0
-    num_pattern = r'\d+'
-    text_pattern = r'<[^>]+>'
+    num_pattern = r"\d+"
+    text_pattern = r"<[^>]+>"
     current_paragraph_number = None
     current_paragraph_text = ""
 
     while True:
-        fragments_url = f"{base_url}{
-            sign_encoded}/fragmenty?cisloStranky={page_number}"
+        fragments_url = f"{base_url}{sign_encoded}/fragmenty?cisloStranky={page_number}"
         try:
-            logger.info(f"Fetching page {page_number} for law"
-                        f"{law.year}/{law.id}")
+            logger.info(f"Fetching page {page_number} for law {law.year}/{law.id}")
             resp = requests.get(fragments_url, headers=headers)
 
             # If we get a 404 or any error, we've reached the end
             if resp.status_code != 200:
-                logger.info(f"Reached end of document at page"
-                            f"{page_number} for law {law.year}/{law.id}")
+                logger.info(
+                    f"Reached end of document at page"
+                    f"{page_number} for law {law.year}/{law.id}"
+                )
                 break
 
             response = resp.json()
-            fragments = response.get('seznam', [])
+            fragments = response.get("seznam", [])
 
             # If no fragments are returned, we've reached the end
             if not fragments:
-                logger.info(f"No more fragments found at page"
-                            f"{page_number} for law {law.year}/{law.id}")
+                logger.info(
+                    f"No more fragments found at page"
+                    f"{page_number} for law {law.year}/{law.id}"
+                )
                 break
 
             for fragment in fragments:
-                kod_typu_fragmentu = fragment.get('kodTypuFragmentu')
-                xhtml_content = fragment.get('xhtml', '')
+                kod_typu_fragmentu = fragment.get("kodTypuFragmentu")
+                xhtml_content = fragment.get("xhtml", "")
 
-                if kod_typu_fragmentu == 'Paragraf':
+                if kod_typu_fragmentu == "Paragraf":
                     # Save previous paragraph if exists
-                    if current_paragraph_number is not None and current_paragraph_text.strip():
-                        law.paragrafy.append(Paragraf(
-                            cislo=current_paragraph_number,
-                            zneni=current_paragraph_text.strip()
-                        ))
+                    if (
+                        current_paragraph_number is not None
+                        and current_paragraph_text.strip()
+                    ):
+                        law.paragrafy.append(
+                            Paragraf(
+                                cislo=current_paragraph_number,
+                                zneni=current_paragraph_text.strip(),
+                            )
+                        )
                     # Start new paragraph
                     match = re.search(num_pattern, xhtml_content)
                     if match is None:
-                        logger.warning(f"Paragraf number not found in fragment for law"
-                                       f"{law.year}/{law.id}")
+                        logger.warning(
+                            f"Paragraf number not found in fragment for law"
+                            f"{law.year}/{law.id}"
+                        )
                         continue
                     current_paragraph_number = match.group()
                     current_paragraph_text = ""
                 else:
                     # Append fragment text to current paragraph
-                    cleaned_text = re.sub(text_pattern, '', xhtml_content)
+                    cleaned_text = re.sub(text_pattern, "", xhtml_content)
                     current_paragraph_text += cleaned_text + "\n"
 
             # Move to next page
@@ -192,22 +207,25 @@ def get_law_details(law: Law, api_key: str) -> Law:
             time.sleep(0.5)
 
         except Exception as e:
-            logger.error(f"Error processing page {page_number} for law"
-                         f"{law.year}/{law.id}: {e}")
+            logger.error(
+                f"Error processing page {page_number} for law"
+                f"{law.year}/{law.id}: {e}"
+            )
             break
 
     # Save the last paragraph if any
     if current_paragraph_number is not None and current_paragraph_text.strip():
-        law.paragrafy.append(Paragraf(
-            cislo=current_paragraph_number,
-            zneni=current_paragraph_text.strip()
-        ))
+        law.paragrafy.append(
+            Paragraf(
+                cislo=current_paragraph_number, zneni=current_paragraph_text.strip()
+            )
+        )
     return law
 
 
 def main():
     # Read the text of laws from the given variable
-    text = '''
+    text = """
 
 HOSPODÁŘSTVÍ
 441/2003 Sb.	Zákon o ochranných známkách	01.04.2004
@@ -311,7 +329,7 @@ TRESTNÍ PRÁVO
 150/2002 Sb.	Soudní řád správní	01.01.2003
 6/2002 Sb.	Zákon o soudech a soudcích	01.04.2002
 
-    '''
+    """
 
     # Parse the laws
     laws = parse_laws(text)
