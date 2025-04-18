@@ -74,7 +74,7 @@ After correcting the text and identifying any recommendations, prepare your outp
     ]
 
 class SttResponse(BaseModel):
-    recommendations: List[str] = Field(description="List of recommendations")
+    recommendations: List[str] = Field(description="List of recommendations. Can be empty if there are no recommendations in the text.")
     text: str = Field(description="Corrected version of the text. The text must not include any recommendations.")
 
 def invoke_llm(messages: List[dict]) -> SttResponse:
