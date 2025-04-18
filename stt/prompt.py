@@ -5,3 +5,5 @@ medications = [
     "Spersadex Comp.", "Spersallerg", "Taflotan", "Taptoqom", "Tobradex", 
     "Tobrex", "Vidisic", "Xalacom", "Xalatan", "Yellox"
 ]
+
+user_prompt = "The following audio contains an ophthalmologist's diagnosis. Common medications that the ophthalmologist may mention: " + ", ".join(medications) + "."

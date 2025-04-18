@@ -3,7 +3,7 @@ from openai import OpenAI
 from typing import List
 
 from stt.config import settings
-from stt.medications import medications
+from stt.prompt import user_prompt
 # Load the OpenAI API key from environment variables or .env.rag file
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -16,7 +16,7 @@ def transcribe_audio_file(filepath: str) -> str:
             file=audio_file,
             response_format="text",
             language="cs",
-            prompt=medications
+            prompt=user_prompt
         )
     return transcription
 
