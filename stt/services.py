@@ -48,8 +48,8 @@ Follow these steps to complete the task:
 6. If there are no recommendations mentioned in the text, include an empty array for the "recommendations" key, like this:
 
 {
-  "text": "Your corrected version of the text goes here",
-  "recommendations": []
+  "recommendations": [],
+  "text": "Your corrected version of the text goes here"
 }
 
 7. If you encounter any words that you are unsure about, especially if they might be technical terms, leave them unchanged in the corrected text.
@@ -62,8 +62,8 @@ __OUTPUT_FORMAT__
 After correcting the text and identifying any recommendations, prepare your output in the following JSON format:
 
 {
-  "text": "Your corrected version of the text goes here, excluding any recommendations",
   "recommendations": ["Recommendation 1", "Recommendation 2", "etc."]
+  "text": "Your corrected version of the text goes here, excluding any recommendations"
 }
 """
         },
@@ -73,18 +73,22 @@ After correcting the text and identifying any recommendations, prepare your outp
         }
     ]
 
+class SttResponse(BaseModel):
+    recommendations: List[str] = Field(description="List of recommendations")
+    text: str = Field(description="Corrected version of the text. The text must not include any recommendations.")
 
-def invoke_llm(messages: List[dict]) -> dict:
-    response = client.chat.completions.create(
+def invoke_llm(messages: List[dict]) -> SttResponse:
+    response = client.beta.chat.completions.parse(
         messages=messages,
         model="gpt-4.1-mini",
         temperature=0.7,
-        response_format={"type": "json_object"}
+        response_format=SttResponse
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.parsed
 
 
-def parse_output(response: str) -> str:
+
+def parse_output(response: str) -> SttResponse:
     response_json = json.loads(response)
 
     if response_json.get("recommendations") == []:
@@ -93,10 +97,10 @@ def parse_output(response: str) -> str:
         recommendations = "\nDoporučení:\n" + "\n".join([f"• {rec}" for rec in response_json.get("recommendations")])
         response_text = response_json.get("text") + recommendations
 
-    return response_text
+    return SttResponse(text=response_text, recommendations=response_json.get("recommendations"))
 
 
-def run_pipeline(text: str) -> str:
+def run_pipeline(text: str) -> SttResponse:
     messages = format_prompt(text)
     response = invoke_llm(messages)
     return parse_output(response)
