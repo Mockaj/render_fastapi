@@ -12,7 +12,7 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 def transcribe_audio_file(filepath: str) -> str:
     with open(filepath, "rb") as audio_file:
         transcription = client.audio.transcriptions.create(
-            model="whisper-1",
+            model="gpt-4o-transcribe",
             file=audio_file,
             response_format="text",
             language="cs",
@@ -77,8 +77,8 @@ After correcting the text and identifying any recommendations, prepare your outp
 def invoke_llm(messages: List[dict]) -> dict:
     response = client.chat.completions.create(
         messages=messages,
-        model="gpt-4o",
-        temperature=1,
+        model="gpt-4.1-mini",
+        temperature=0.7,
         response_format={"type": "json_object"}
     )
     return response.choices[0].message.content
