@@ -1,7 +1,7 @@
 import json
 from openai import OpenAI
 from typing import List
-
+from pydantic import BaseModel, Field
 from stt.config import settings
 from stt.prompt import user_prompt
 # Load the OpenAI API key from environment variables or .env.rag file
