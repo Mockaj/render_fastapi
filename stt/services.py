@@ -86,21 +86,17 @@ def invoke_llm(messages: List[dict]) -> SttResponse:
     )
     return response.choices[0].message.parsed
 
-
-
-def parse_output(response: str) -> SttResponse:
-    response_json = json.loads(response)
-
-    if response_json.get("recommendations") == []:
-        response_text = response_json.get("text")
+def parse_output(response: SttResponse) -> str:
+    if response.recommendations == []:
+        response_text = response.text
     else:
-        recommendations = "\nDoporučení:\n" + "\n".join([f"• {rec}" for rec in response_json.get("recommendations")])
-        response_text = response_json.get("text") + recommendations
+        recommendations = "\nDoporučení:\n" + "\n".join([f"• {rec}" for rec in response.recommendations])
+        response_text = response.text + recommendations
 
-    return SttResponse(text=response_text, recommendations=response_json.get("recommendations"))
+    return response_text
 
 
-def run_pipeline(text: str) -> SttResponse:
+def run_pipeline(text: str) -> str:
     messages = format_prompt(text)
     response = invoke_llm(messages)
     return parse_output(response)
